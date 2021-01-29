@@ -5,13 +5,24 @@ import json
 import ConfigParser
 import time
 import daemon
+import signal
+import datetime
 # from spam import do_main_program
 
-logfile = open('/var/log/pyscanner.log', 'w')
+logfile = open('/var/log/pyscanner.log', 'a')
+import sys
+sys.stdout = logfile
+
+def receiveSignal(signalNumber, frame):
+	print('Received:', signalNumber)
+	logfile.close()
+	quit()
+	return
+
+signal.signal(signal.SIGTERM, receiveSignal)
 
 
-
-api_key = "ezporpfcerpcrezp"
+api_key = "cmqkjdqmdkqsdkml"
 service_url = "https://liina.irtsnouvelleaquitaine.fr/barcode/api"
 
 
@@ -20,23 +31,17 @@ service_url = "https://liina.irtsnouvelleaquitaine.fr/barcode/api"
 ## configFilePath = r'/etc/'
 ## configParser.read(configFilePath)
 
+location='/dev/hidraw1' ## None
 
 context = pd.Context()
 
-for device in context.list_devices(subsystem='hidraw'):
-	print(device)
-
-location=None
-
-
 while (location == None):
 	for device in context.list_devices(subsystem='hidraw'):
-		if ('{0}'.format(device.find_parent('hid'))).find('0003:1D82:5CA0.0004') != -1:
+		if ('{0}'.format(device.find_parent('hid'))).find('0003:1D82:5CA0') != -1:
+			print device.device_node
 			location = device.device_node
 	if (location == None):
 		time.sleep(1)
-
-print location
 
 
 def barcode_reader():
@@ -100,6 +105,7 @@ def barcode_reader():
     return ss
 
 def send_scan(barcode):
+	print("%s : %s " % (datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),  barcode )) 
 	post_data= {
 		'key' : api_key,
 		'action': 'EmargementBiQuotidien',
@@ -107,18 +113,28 @@ def send_scan(barcode):
 	}
 	try:
 		response = requests.post(service_url,post_data)
-		print("-----" * 5)
-		print(barcode)
+#		print("-----" * 5)
+#		print(barcode)
 		print(response.text)
+		
 	except Exception as e:
 		print('error')
 		print e
+	logfile.flush()
 
 def main():
+	print "Start scanner"
 	while True:
-		send_scan(barcode_reader())
+		try:
+			send_scan(barcode_reader())
+		except Exception as e:
+			print('error')
+			print e
 
-with daemon.DaemonContext(stdout = logfile, stderr = logfile):
+# with daemon.DaemonContext(stdout = logfile, stderr = logfile):
+#    main()
+
+
+if __name__ == "__main__":
     main()
-
 
